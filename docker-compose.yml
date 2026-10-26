@@ -45,6 +45,7 @@ services:
       MODEL_PATH: "/app/models/lgbm_return_model.pkl"
     volumes:
       - ./lgbm_return_model.pkl:/app/models/lgbm_return_model.pkl:ro
+      - ./backend/backend.py:/app/backend.py:ro
     restart: unless-stopped
 
   frontend:
@@ -59,6 +60,9 @@ services:
     environment:
       BACKEND_STREAM_URL: "http://backend:8000/stream"
       BACKEND_BASE_URL: "http://backend:8000"
+    volumes:
+      - ./frontend/dashboard.py:/app/dashboard.py:ro
+      - ./frontend/.streamlit:/app/.streamlit:ro
     restart: unless-stopped
 
   producer:
@@ -74,4 +78,5 @@ services:
       DATASET_PATH: "/app/data/holdout_test_data.csv"
     volumes:
       - ./data:/app/data:ro
+      - ./producer/producer.py:/app/producer.py:ro
     restart: unless-stopped

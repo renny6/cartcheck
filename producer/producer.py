@@ -87,6 +87,8 @@ def main():
             # Format payload strictly adhering to 05_backend_schema.md
             payload = {
                 "transaction_id": str(row["transaction_id"]),
+                "user_id": str(row.get("user_id", "U000000")),
+                "product_id": str(row.get("product_id", "P00000")),
                 "category": str(row["category"]),
                 "price": float(row["price"]),
                 "product_historical_return_rate": float(row["product_historical_return_rate"]),

@@ -177,16 +177,42 @@ def kafka_consumer_worker(loop: asyncio.AbstractEventLoop):
                     
                     if is_flagged:
                         state.total_flagged += 1
+                        dup_variants = int(payload.get("duplicate_variant_count", 0))
+                        user_ret = float(payload.get("user_historical_return_rate", 0.0))
+                        prod_ret = float(payload.get("product_historical_return_rate", 0.0))
+                        
+                        # Explicit reasoning logic
+                        trigger_reasons = []
+                        if dup_variants >= 2:
+                            trigger_reasons.append(f"Bracket Buying - {dup_variants} duplicate variants")
+                        if user_ret >= 0.25:
+                            trigger_reasons.append(f"Serial Returner - High User History ({user_ret*100:.1f}%)")
+                        elif user_ret >= 0.18:
+                            trigger_reasons.append(f"Elevated User Return History ({user_ret*100:.1f}%)")
+                        if prod_ret >= 0.20 and not trigger_reasons:
+                            trigger_reasons.append(f"High Return Risk Category ({prod_ret*100:.1f}%)")
+                        
+                        if not trigger_reasons:
+                            trigger_reasons.append(f"High-Risk Cart Composition ({risk_score*100:.1f}%)")
+                            
+                        primary_reason = " & ".join(trigger_reasons)
+                        
                         alert_data = {
                             "type": "alert",
                             "transaction_id": payload.get("transaction_id", "UNKNOWN"),
+                            "user_id": payload.get("user_id", "U" + str(payload.get("transaction_id", "000000")).replace("T", "")),
+                            "product_id": payload.get("product_id", "P00000"),
                             "risk_score": round(risk_score, 4),
-                            "category": payload.get("category"),
-                            "price": payload.get("price"),
-                            "cart_total_value": payload.get("cart_total_value"),
-                            "total_items_in_cart": payload.get("total_items_in_cart"),
-                            "duplicate_variant_count": payload.get("duplicate_variant_count"),
-                            "user_return_rate": payload.get("user_historical_return_rate"),
+                            "category": payload.get("category", "General"),
+                            "price": float(payload.get("price", 0.0)),
+                            "product_historical_return_rate": prod_ret,
+                            "account_age_days": int(payload.get("account_age_days", 0)),
+                            "user_historical_return_rate": user_ret,
+                            "user_return_rate": user_ret,
+                            "cart_total_value": float(payload.get("cart_total_value", 0.0)),
+                            "total_items_in_cart": int(payload.get("total_items_in_cart", 1)),
+                            "duplicate_variant_count": dup_variants,
+                            "reason": primary_reason,
                             "timestamp": time.strftime("%H:%M:%S")
                         }
                         state.recent_alerts.appendleft(alert_data)

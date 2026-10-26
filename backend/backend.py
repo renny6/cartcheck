@@ -153,35 +153,57 @@ def kafka_consumer_worker(loop: asyncio.AbstractEventLoop):
                     state.total_processed += 1
                     state.rolling_timestamps.append(now)
                     
-                    # Prepare input for LightGBM
-                    input_row = {
-                        'category': payload.get('category'),
-                        'price': float(payload.get('price', 0.0)),
-                        'product_historical_return_rate': float(payload.get('product_historical_return_rate', 0.0)),
-                        'account_age_days': int(payload.get('account_age_days', 0)),
-                        'user_historical_return_rate': float(payload.get('user_historical_return_rate', 0.0)),
-                        'cart_total_value': float(payload.get('cart_total_value', 0.0)),
-                        'total_items_in_cart': int(payload.get('total_items_in_cart', 1)),
-                        'duplicate_variant_count': int(payload.get('duplicate_variant_count', 0))
-                    }
+                    # Extract items list if present, otherwise single item from flat payload
+                    raw_items = payload.get("items")
+                    if not raw_items:
+                        raw_items = [{
+                            "product_id": payload.get("product_id", "P00000"),
+                            "category": payload.get("category", "General"),
+                            "price": float(payload.get("price", 0.0)),
+                            "product_historical_return_rate": float(payload.get("product_historical_return_rate", 0.0)),
+                            "duplicate_variant_count": int(payload.get("duplicate_variant_count", 0))
+                        }]
                     
-                    df_single = pd.DataFrame([input_row], columns=FEATURE_COLS)
-                    df_single['category'] = df_single['category'].astype('category')
+                    # Prepare batch input for LightGBM
+                    input_rows = []
+                    account_age = int(payload.get('account_age_days', 0))
+                    user_ret = float(payload.get('user_historical_return_rate', payload.get('user_return_rate', 0.0)))
+                    cart_val = float(payload.get('cart_total_value', 0.0))
+                    total_items = int(payload.get('total_items_in_cart', len(raw_items)))
+                    cart_dup_variants = int(payload.get('duplicate_variant_count', 0))
                     
-                    # Run inference
-                    risk_score = 0.0
+                    for item in raw_items:
+                        input_rows.append({
+                            'category': item.get('category', 'General'),
+                            'price': float(item.get('price', 0.0)),
+                            'product_historical_return_rate': float(item.get('product_historical_return_rate', 0.0)),
+                            'account_age_days': account_age,
+                            'user_historical_return_rate': user_ret,
+                            'cart_total_value': cart_val,
+                            'total_items_in_cart': total_items,
+                            'duplicate_variant_count': int(item.get('duplicate_variant_count', cart_dup_variants))
+                        })
+                    
+                    df_batch = pd.DataFrame(input_rows, columns=FEATURE_COLS)
+                    df_batch['category'] = df_batch['category'].astype('category')
+                    
+                    # Run inference across all items in cart
+                    item_probs = [0.0] * len(input_rows)
                     if state.model is not None:
-                        risk_score = float(state.model.predict_proba(df_single)[:, 1][0])
+                        item_probs = state.model.predict_proba(df_batch)[:, 1]
                     
-                    is_flagged = (risk_score >= 0.80)
+                    evaluated_items = []
+                    any_flagged = False
                     
-                    if is_flagged:
-                        state.total_flagged += 1
-                        dup_variants = int(payload.get("duplicate_variant_count", 0))
-                        user_ret = float(payload.get("user_historical_return_rate", 0.0))
-                        prod_ret = float(payload.get("product_historical_return_rate", 0.0))
-                        
-                        # Explicit reasoning logic
+                    for i, item in enumerate(raw_items):
+                        prob = float(item_probs[i])
+                        is_it_flagged = (prob >= 0.80)
+                        if is_it_flagged:
+                            any_flagged = True
+                            
+                        # Explicit reasoning logic for this item
+                        dup_variants = int(input_rows[i]['duplicate_variant_count'])
+                        prod_ret = float(input_rows[i]['product_historical_return_rate'])
                         trigger_reasons = []
                         if dup_variants >= 2:
                             trigger_reasons.append(f"Bracket Buying - {dup_variants} duplicate variants")
@@ -191,33 +213,40 @@ def kafka_consumer_worker(loop: asyncio.AbstractEventLoop):
                             trigger_reasons.append(f"Elevated User Return History ({user_ret*100:.1f}%)")
                         if prod_ret >= 0.20 and not trigger_reasons:
                             trigger_reasons.append(f"High Return Risk Category ({prod_ret*100:.1f}%)")
-                        
                         if not trigger_reasons:
-                            trigger_reasons.append(f"High-Risk Cart Composition ({risk_score*100:.1f}%)")
-                            
-                        primary_reason = " & ".join(trigger_reasons)
+                            trigger_reasons.append(f"High Return Risk Profile ({prob*100:.1f}%)")
+                        
+                        item_reason = " & ".join(trigger_reasons)
+                        
+                        evaluated_items.append({
+                            "product_id": str(item.get("product_id", f"P{i:04d}")),
+                            "category": str(item.get("category", "General")),
+                            "price": float(item.get("price", 0.0)),
+                            "risk_score": round(prob, 4),
+                            "is_flagged": is_it_flagged,
+                            "reason": item_reason if is_it_flagged else ""
+                        })
+                    
+                    if any_flagged:
+                        state.total_flagged += 1
+                        cart_risk = max(it["risk_score"] for it in evaluated_items)
                         
                         alert_data = {
                             "type": "alert",
                             "transaction_id": payload.get("transaction_id", "UNKNOWN"),
                             "user_id": payload.get("user_id", "U" + str(payload.get("transaction_id", "000000")).replace("T", "")),
-                            "product_id": payload.get("product_id", "P00000"),
-                            "risk_score": round(risk_score, 4),
-                            "category": payload.get("category", "General"),
-                            "price": float(payload.get("price", 0.0)),
-                            "product_historical_return_rate": prod_ret,
-                            "account_age_days": int(payload.get("account_age_days", 0)),
+                            "risk_score": round(cart_risk, 4),
+                            "account_age_days": account_age,
                             "user_historical_return_rate": user_ret,
-                            "user_return_rate": user_ret,
-                            "cart_total_value": float(payload.get("cart_total_value", 0.0)),
-                            "total_items_in_cart": int(payload.get("total_items_in_cart", 1)),
-                            "duplicate_variant_count": dup_variants,
-                            "reason": primary_reason,
-                            "timestamp": time.strftime("%H:%M:%S")
+                            "cart_total_value": cart_val,
+                            "total_items_in_cart": total_items,
+                            "duplicate_variant_count": cart_dup_variants,
+                            "timestamp": time.strftime("%H:%M:%S"),
+                            "items": evaluated_items
                         }
                         state.recent_alerts.appendleft(alert_data)
                         
-                        # Immediately broadcast high-risk alert
+                        # Immediately broadcast high-risk cart alert
                         asyncio.run_coroutine_threadsafe(broadcast_event(alert_data), loop)
 
             # Broadcast throughput & aggregate metrics once per second

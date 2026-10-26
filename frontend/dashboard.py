@@ -207,23 +207,47 @@ def render_live_cart_inspector():
                 st.caption("User Historical Return Rate")
                 st.write(f"🔄 {user_ret * 100:.1f}%")
 
-            # Cart Items & Details Section
-            st.write("**Cart Items & Details**")
-            i_col1, i_col2, i_col3, i_col4 = st.columns(4)
-            with i_col1:
-                st.caption("Product & Category")
-                st.write(f"📦 `{product_id}` ({category})")
-            with i_col2:
-                st.caption("Item Price")
-                st.write(f"💵 ${price:.2f}")
-            with i_col3:
+            # Cart Summary Row
+            s_col1, s_col2, s_col3 = st.columns(3)
+            with s_col1:
                 st.caption("Cart Total Value")
                 st.write(f"💰 ${cart_val:.2f}")
-            with i_col4:
-                st.caption("Items & Variants")
-                st.write(f"🔢 {total_items} items ({dup_count} duplicate variants)")
+            with s_col2:
+                st.caption("Total Items in Cart")
+                st.write(f"🛒 {total_items} item{'s' if total_items > 1 else ''}")
+            with s_col3:
+                st.caption("Duplicate Variants")
+                st.write(f"🔢 {dup_count} variant{'s' if dup_count > 1 else ''}")
 
-            # Threshold Violation Trigger with Explicit Reason
-            st.error(f"🚨 Flagged Item: {category} (Risk: {risk_score * 100:.1f}%) | Reason: {reason}")
+            st.divider()
+
+            # Cart Items & Details Section
+            st.write("**Cart Items & Details**")
+            
+            # Extract all items associated with this transaction_id
+            cart_items = cart.get("items")
+            if not cart_items:
+                cart_items = [{
+                    "product_id": product_id,
+                    "category": category,
+                    "price": price,
+                    "risk_score": risk_score,
+                    "is_flagged": True,
+                    "reason": reason
+                }]
+
+            # Stack all items vertically: safe items with st.markdown, high-risk items with st.error
+            for item in cart_items:
+                item_pid = item.get("product_id", "P00000")
+                item_cat = item.get("category", "General")
+                item_price = float(item.get("price", 0.0))
+                item_risk = float(item.get("risk_score", 0.0))
+                is_flagged_item = item.get("is_flagged", item_risk >= 0.80)
+                item_reason = item.get("reason", reason)
+
+                if is_flagged_item:
+                    st.error(f"🚨 {item_pid} - {item_cat} - ${item_price:.2f} (Risk: {item_risk * 100:.1f}%) | Reason: {item_reason}")
+                else:
+                    st.markdown(f"🟢 {item_pid} - {item_cat} - ${item_price:.2f}")
 
 render_live_cart_inspector()

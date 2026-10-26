@@ -117,6 +117,24 @@ if paused:
 else:
     st.success("🟢 Live Feed Active — Continuously monitoring Kafka event stream.")
 
+# Advanced Risk Reasoning Logic Tree
+def get_advanced_risk_reason(
+    duplicate_variant_count: int,
+    account_age_days: int,
+    product_historical_return_rate: float,
+    cart_total_value: float
+) -> str:
+    if duplicate_variant_count >= 2:
+        return "Reason: Bracket Buying Detected"
+    elif account_age_days < 30:
+        return "Reason: New Account Anomaly (Hit-and-Run Risk)"
+    elif product_historical_return_rate > 0.30:
+        return "Reason: Historically Volatile SKU"
+    elif cart_total_value > 500:
+        return "Reason: High Cart Value (Buyer's Remorse Risk)"
+    else:
+        return "Reason: Serial Returner Profile"
+
 # Real-time display fragment
 @st.fragment(run_every="0.5s")
 def render_live_cart_inspector():
@@ -168,22 +186,6 @@ def render_live_cart_inspector():
         dup_count = int(cart.get("duplicate_variant_count", 0))
         ts = cart.get("timestamp", "--:--:--")
 
-        # Explicit reasoning logic
-        reason = cart.get("reason")
-        if not reason:
-            reasons = []
-            if dup_count >= 2:
-                reasons.append(f"Bracket Buying - {dup_count} duplicate variants")
-            if user_ret >= 0.25:
-                reasons.append(f"Serial Returner - High User History ({user_ret*100:.1f}%)")
-            elif user_ret >= 0.18:
-                reasons.append(f"Elevated User Return History ({user_ret*100:.1f}%)")
-            if prod_ret >= 0.20 and not reasons:
-                reasons.append(f"High Return Risk Category ({prod_ret*100:.1f}%)")
-            if not reasons:
-                reasons.append(f"High-Risk Cart Profile ({risk_score*100:.1f}%)")
-            reason = " & ".join(reasons)
-
         with st.container(border=True):
             header_col1, header_col2, header_col3 = st.columns([3, 1, 1])
             with header_col1:
@@ -233,21 +235,43 @@ def render_live_cart_inspector():
                     "price": price,
                     "risk_score": risk_score,
                     "is_flagged": True,
-                    "reason": reason
+                    "duplicate_variant_count": dup_count,
+                    "product_historical_return_rate": prod_ret
                 }]
 
-            # Stack all items vertically: safe items with st.markdown, high-risk items with st.error
+            # Boxed Item Layout: render every item inside its own distinct bounded box
             for item in cart_items:
                 item_pid = item.get("product_id", "P00000")
                 item_cat = item.get("category", "General")
                 item_price = float(item.get("price", 0.0))
                 item_risk = float(item.get("risk_score", 0.0))
                 is_flagged_item = item.get("is_flagged", item_risk >= 0.80)
-                item_reason = item.get("reason", reason)
+                item_dup = int(item.get("duplicate_variant_count", dup_count))
+                item_prod_ret = float(item.get("product_historical_return_rate", prod_ret))
 
                 if is_flagged_item:
-                    st.error(f"🚨 {item_pid} - {item_cat} - ${item_price:.2f} (Risk: {item_risk * 100:.1f}%) | Reason: {item_reason}")
+                    # Dynamically determine display reason via advanced logic tree
+                    reason_str = get_advanced_risk_reason(
+                        duplicate_variant_count=item_dup,
+                        account_age_days=account_age,
+                        product_historical_return_rate=item_prod_ret,
+                        cart_total_value=cart_val
+                    )
+                    # Flagged Items: Render inside a blue box using st.info()
+                    st.info(
+                        f"🚨 **Flagged Item: {item_pid}** — {item_cat} — **${item_price:.2f}** &nbsp;|&nbsp; "
+                        f"**Risk Score: {item_risk * 100:.1f}%**\n\n"
+                        f"**{reason_str}**"
+                    )
                 else:
-                    st.markdown(f"🟢 {item_pid} - {item_cat} - ${item_price:.2f}")
+                    # Safe Items: Render inside a standard st.container(border=True) as neutral card
+                    with st.container(border=True):
+                        c_s1, c_s2, c_s3 = st.columns([2, 1, 1])
+                        with c_s1:
+                            st.write(f"🟢 **{item_pid}** • {item_cat}")
+                        with c_s2:
+                            st.write(f"${item_price:.2f}")
+                        with c_s3:
+                            st.caption(f"Risk: {item_risk * 100:.1f}% (Safe)")
 
 render_live_cart_inspector()

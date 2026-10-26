@@ -224,6 +224,8 @@ def kafka_consumer_worker(loop: asyncio.AbstractEventLoop):
                             "price": float(item.get("price", 0.0)),
                             "risk_score": round(prob, 4),
                             "is_flagged": is_it_flagged,
+                            "duplicate_variant_count": dup_variants,
+                            "product_historical_return_rate": prod_ret,
                             "reason": item_reason if is_it_flagged else ""
                         })
                     

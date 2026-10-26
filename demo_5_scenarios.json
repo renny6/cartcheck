@@ -1,0 +1,148 @@
+[
+  {
+    "transaction_id": "T0000026",
+    "user_id": "U0000026",
+    "account_age_days": 898,
+    "user_historical_return_rate": 0.248,
+    "cart_total_value": 129.12,
+    "total_items_in_cart": 2,
+    "duplicate_variant_count": 2,
+    "items": [
+      {
+        "product_id": "P02134",
+        "category": "Electronics",
+        "price": 64.56,
+        "product_historical_return_rate": 0.0913,
+        "duplicate_variant_count": 2
+      },
+      {
+        "product_id": "P02134",
+        "category": "Electronics",
+        "price": 64.56,
+        "product_historical_return_rate": 0.0913,
+        "duplicate_variant_count": 2
+      }
+    ]
+  },
+  {
+    "transaction_id": "T0061000",
+    "user_id": "U0061000",
+    "account_age_days": 9,
+    "user_historical_return_rate": 0.7401,
+    "cart_total_value": 336.67,
+    "total_items_in_cart": 3,
+    "duplicate_variant_count": 1,
+    "items": [
+      {
+        "product_id": "P02772",
+        "category": "Beauty",
+        "price": 11.55,
+        "product_historical_return_rate": 0.05,
+        "duplicate_variant_count": 1
+      },
+      {
+        "product_id": "P00071",
+        "category": "Footwear",
+        "price": 254.97,
+        "product_historical_return_rate": 0.3077,
+        "duplicate_variant_count": 1
+      },
+      {
+        "product_id": "P00550",
+        "category": "Footwear",
+        "price": 70.15,
+        "product_historical_return_rate": 0.2329,
+        "duplicate_variant_count": 1
+      }
+    ]
+  },
+  {
+    "transaction_id": "T0000539",
+    "user_id": "U0000539",
+    "account_age_days": 748,
+    "user_historical_return_rate": 0.7865,
+    "cart_total_value": 116.2,
+    "total_items_in_cart": 2,
+    "duplicate_variant_count": 1,
+    "items": [
+      {
+        "product_id": "P01689",
+        "category": "Footwear",
+        "price": 63.31,
+        "product_historical_return_rate": 0.3163,
+        "duplicate_variant_count": 1
+      },
+      {
+        "product_id": "P04894",
+        "category": "Home",
+        "price": 52.89,
+        "product_historical_return_rate": 0.0772,
+        "duplicate_variant_count": 1
+      }
+    ]
+  },
+  {
+    "transaction_id": "T0007299",
+    "user_id": "U0007299",
+    "account_age_days": 1301,
+    "user_historical_return_rate": 0.7283,
+    "cart_total_value": 565.49,
+    "total_items_in_cart": 4,
+    "duplicate_variant_count": 1,
+    "items": [
+      {
+        "product_id": "P02429",
+        "category": "Home",
+        "price": 81.29,
+        "product_historical_return_rate": 0.0517,
+        "duplicate_variant_count": 1
+      },
+      {
+        "product_id": "P03184",
+        "category": "Apparel",
+        "price": 34.9,
+        "product_historical_return_rate": 0.2295,
+        "duplicate_variant_count": 1
+      },
+      {
+        "product_id": "P03903",
+        "category": "Electronics",
+        "price": 164.92,
+        "product_historical_return_rate": 0.05,
+        "duplicate_variant_count": 1
+      },
+      {
+        "product_id": "P00577",
+        "category": "Electronics",
+        "price": 284.38,
+        "product_historical_return_rate": 0.109,
+        "duplicate_variant_count": 1
+      }
+    ]
+  },
+  {
+    "transaction_id": "T0000356",
+    "user_id": "U0000356",
+    "account_age_days": 275,
+    "user_historical_return_rate": 0.7447,
+    "cart_total_value": 104.61,
+    "total_items_in_cart": 2,
+    "duplicate_variant_count": 1,
+    "items": [
+      {
+        "product_id": "P01031",
+        "category": "Home",
+        "price": 16.55,
+        "product_historical_return_rate": 0.05,
+        "duplicate_variant_count": 1
+      },
+      {
+        "product_id": "P04128",
+        "category": "Home",
+        "price": 88.06,
+        "product_historical_return_rate": 0.2456,
+        "duplicate_variant_count": 1
+      }
+    ]
+  }
+]

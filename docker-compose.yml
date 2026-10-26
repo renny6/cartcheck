@@ -1,0 +1,77 @@
+version: '3.8'
+
+services:
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.5.0
+    container_name: cartcheck-zookeeper
+    ports:
+      - "2181:2181"
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    restart: unless-stopped
+
+  kafka:
+    image: confluentinc/cp-kafka:7.5.0
+    container_name: cartcheck-kafka
+    depends_on:
+      - zookeeper
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:29092,PLAINTEXT_HOST://localhost:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "true"
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: cartcheck-backend
+    depends_on:
+      - kafka
+    ports:
+      - "8000:8000"
+    environment:
+      KAFKA_BROKER_URL: "kafka:29092"
+      KAFKA_TOPIC: "live_cart_events"
+      MODEL_PATH: "/app/models/lgbm_return_model.pkl"
+    volumes:
+      - ./lgbm_return_model.pkl:/app/models/lgbm_return_model.pkl:ro
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: cartcheck-frontend
+    depends_on:
+      - backend
+    ports:
+      - "8501:8501"
+    environment:
+      BACKEND_STREAM_URL: "http://backend:8000/stream"
+      BACKEND_BASE_URL: "http://backend:8000"
+    restart: unless-stopped
+
+  producer:
+    build:
+      context: ./producer
+      dockerfile: Dockerfile
+    container_name: cartcheck-producer
+    depends_on:
+      - kafka
+    environment:
+      KAFKA_BROKER_URL: "kafka:29092"
+      KAFKA_TOPIC: "live_cart_events"
+      DATASET_PATH: "/app/data/holdout_test_data.csv"
+    volumes:
+      - ./data:/app/data:ro
+    restart: unless-stopped
